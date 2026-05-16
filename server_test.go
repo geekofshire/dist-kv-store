@@ -11,7 +11,10 @@ func TestGetHandler(t *testing.T) {
 	store := NewStore()
 	store.Set("name", "alice")
 
-	server := &Server{}
+	server := &Server{
+		store: NewStore(),
+		log_entry: NewLogEntry(),
+	}
 
 	mux := http.NewServeMux()
 	server.routes(mux)

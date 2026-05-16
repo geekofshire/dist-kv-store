@@ -54,26 +54,3 @@ func (l *LogEntry) Append(cmd CommandType, key, value string) {
 	l.entries = append(l.entries, new_entry)
 	l.cond.Signal()
 }
-
-func (l *LogEntry) ApplyLoop() {
-	for {
-		l.mu.Lock()
-
-		for l.applied >= len(l.entries) {
-			l.cond.Wait()
-		}
-
-		unapplied_entries := make([]Entry, len(l.entries[l.applied:]))
-		copy(unapplied_entries, l.entries[l.applied:])
-		start := l.applied
-		l.mu.Unlock()
-
-		for i, entry := range unapplied_entries {
-			store.ApplyLog(entry)
-
-			l.mu.Lock()
-			l.applied = l.applied + start + i
-			l.mu.Unlock()
-		}
-	}
-}

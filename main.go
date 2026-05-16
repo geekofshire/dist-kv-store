@@ -6,14 +6,12 @@ import (
 	"time"
 )
 
-var (
-	store = NewStore()
-	log_entry = NewLogEntry()
-)
-
 func main() {
 	mux := http.ServeMux{}
-	handler := &Server{}
+	handler := &Server{
+		store: NewStore(),
+		log_entry: NewLogEntry(),
+	}
 
 	handler.routes(&mux)
 	srv := &http.Server{
@@ -22,6 +20,8 @@ func main() {
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 	}
+
+	go handler.ApplyLoop()
 
 	fmt.Println("listening on :8081")
 	srv.ListenAndServe()

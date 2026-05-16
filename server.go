@@ -7,7 +7,10 @@ import (
 	"strings"
 )
 
-type Server struct {}
+type Server struct {
+	store *Store
+	log_entry *LogEntry
+}
 
 func writeJSON(w http.ResponseWriter, status int, v any) error {
 	w.Header().Set("Content-Type", "application/json")
@@ -41,7 +44,7 @@ func (s *Server) Get(w http.ResponseWriter, r *http.Request) {
 		Value string `json:"value"`
 	}
 
-	value, ok := store.Get(key)
+	value, ok := s.store.Get(key)
 	if !ok {
 		http.Error(w, "key not found", http.StatusNotFound)
 		return
@@ -55,7 +58,7 @@ func (s *Server) Get(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) Delete(w http.ResponseWriter, r *http.Request) {
 	key := r.PathValue("key")
-	log_entry.Append(Delete, key, "")
+	s.log_entry.Append(Delete, key, "")
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -75,8 +78,32 @@ func (s *Server) Set(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log_entry.Append(Set, request.Key, request.Value)
+	s.log_entry.Append(Set, request.Key, request.Value)
 	w.WriteHeader(http.StatusCreated)
+}
+
+func (s *Server) ApplyLoop() {
+	for {
+		l := s.log_entry
+		l.mu.Lock()
+
+		for l.applied >= len(l.entries) {
+			l.cond.Wait()
+		}
+
+		unapplied_entries := make([]Entry, len(l.entries[l.applied:]))
+		copy(unapplied_entries, l.entries[l.applied:])
+		start := l.applied
+		l.mu.Unlock()
+
+		for i, entry := range unapplied_entries {
+			s.store.ApplyLog(entry)
+
+			l.mu.Lock()
+			l.applied = l.applied + start + i
+			l.mu.Unlock()
+		}
+	}
 }
 
 func (s *Server) routes(mux *http.ServeMux) {
