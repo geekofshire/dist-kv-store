@@ -20,18 +20,63 @@ func TestStoreSetGet(t *testing.T) {
 
 func TestStoreDelete(t *testing.T) {
 	store := NewStore()
-
 	store.Set("name", "alice")
 
-	ok := store.Delete("name")
-
-	if !ok {
-		t.Fatal("expected delete to succeed")
+	var delete_test_cases = []struct {
+		key string
+		ok  bool
+	}{
+		{"name", true},
+		{"alice", false},
 	}
 
-	_, exists := store.Get("name")
+	for _, tt := range delete_test_cases {
+		t.Run(tt.key, func(t *testing.T) {
+			ok := store.Delete(tt.key)
+			if ok != tt.ok {
+				t.Errorf("got %t expected %t", ok, tt.ok)
+			}
+		})
+	}
+}
 
-	if exists {
-		t.Fatal("expected key to be deleted")
+func TestApplyLog(t *testing.T) {
+	store := NewStore()
+	store.Set("name", "Alice")
+
+	var applyloopTestcases = []struct {
+		entry Entry
+		ok    bool
+		name  string
+	}{
+		{
+			entry: Entry{
+				Cmd:   Set,
+				Key:   "name",
+				Value: "rohan",
+				Index: 0,
+			},
+			ok:   true,
+			name: "first",
+		},
+		{
+			entry: Entry{
+				Cmd:   Delete,
+				Key:   "roll",
+				Value: "rohan",
+				Index: 1,
+			},
+			ok:   false,
+			name: "second",
+		},
+	}
+
+	for _, tt := range applyloopTestcases {
+		t.Run(tt.name, func(t *testing.T) {
+			resp := store.ApplyLog(tt.entry)
+			if resp != tt.ok {
+				t.Errorf("got %t expected %t", resp, tt.ok)
+			}
+		})
 	}
 }

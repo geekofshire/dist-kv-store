@@ -9,7 +9,7 @@ import (
 func main() {
 	mux := http.ServeMux{}
 	handler := &Server{
-		store: NewStore(),
+		store:     NewStore(),
 		log_entry: NewLogEntry(),
 	}
 

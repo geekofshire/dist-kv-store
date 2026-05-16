@@ -8,13 +8,11 @@ import (
 )
 
 func TestGetHandler(t *testing.T) {
-	store := NewStore()
-	store.Set("name", "alice")
-
 	server := &Server{
-		store: NewStore(),
+		store:     NewStore(),
 		log_entry: NewLogEntry(),
 	}
+	server.store.Set("name", "alice")
 
 	mux := http.NewServeMux()
 	server.routes(mux)
@@ -37,7 +35,10 @@ func TestGetHandler(t *testing.T) {
 }
 
 func TestSetHandler(t *testing.T) {
-	server := &Server{}
+	server := &Server{
+		store:     NewStore(),
+		log_entry: NewLogEntry(),
+	}
 
 	mux := http.NewServeMux()
 	server.routes(mux)
@@ -56,5 +57,30 @@ func TestSetHandler(t *testing.T) {
 
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("expected status 201, got %d", rec.Code)
+	}
+}
+
+func TestDeleteHandler(t *testing.T) {
+	server := &Server{
+		store:     NewStore(),
+		log_entry: NewLogEntry(),
+	}
+
+	mux := http.NewServeMux()
+	server.routes(mux)
+
+	server.store.Set("name", "alice")
+
+	req := httptest.NewRequest(
+		http.MethodDelete,
+		"/delete/name",
+		nil,
+	)
+
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected %d got %d", http.StatusNoContent, rec.Code)
 	}
 }

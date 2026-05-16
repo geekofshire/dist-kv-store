@@ -8,7 +8,7 @@ import (
 )
 
 type Server struct {
-	store *Store
+	store     *Store
 	log_entry *LogEntry
 }
 
