@@ -47,11 +47,11 @@ func NewLogEntry() *LogEntry {
 	return l
 }
 
-func (l *LogEntry) Append(cmd CommandType, key, value string) {
+func (l *LogEntry) Append(cmd CommandType, key, value string, term, index int) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	new_entry := Entry{Cmd: cmd, Key: key, Value: value, Index: len(l.entries)}
+	new_entry := Entry{Cmd: cmd, Key: key, Value: value, Index: index, Term: term}
 	l.entries = append(l.entries, new_entry)
 	l.cond.Signal()
 }

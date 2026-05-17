@@ -13,7 +13,7 @@ const (
 type RaftNode struct {
 	id    string
 	peers []string // peer node addresses
-	role Role
+	role  Role
 
 	// data that needs to be written to disk
 	currentTerm int
@@ -34,21 +34,21 @@ type RaftNode struct {
 	matchIndex map[string]int
 
 	// channels to change state or notify
-	resetElectionCh  chan struct{}
-	commitNotifyCh chan struct{}
-	stopCh           chan struct{}
+	resetElectionCh chan struct{}
+	commitNotifyCh  chan struct{}
+	stopCh          chan struct{}
 
 	mu sync.RWMutex
 }
 
-func NewRaftNode(id string, peers [] string) *RaftNode {
+func NewRaftNode(id string, peers []string) *RaftNode {
 	return &RaftNode{
-		id: id,
-		peers: peers,
-		role: Follower,
-		log: NewLogEntry(),
-		store: NewStore(),
-		nextIndex: make(map[string]int),
+		id:         id,
+		peers:      peers,
+		role:       Follower,
+		log:        NewLogEntry(),
+		store:      NewStore(),
+		nextIndex:  make(map[string]int),
 		matchIndex: make(map[string]int),
 	}
 }
@@ -56,14 +56,14 @@ func NewRaftNode(id string, peers [] string) *RaftNode {
 func (raftNode *RaftNode) run() {
 	for {
 		switch raftNode.role {
-			case Follower:
-				// raftNode.runFollower()
+		case Follower:
+			// raftNode.runFollower()
 
-			case Leader:
-				// raftNode.runLeader()
+		case Leader:
+			// raftNode.runLeader()
 
-			case Candidate:
-				// raft.runCandidate()
+		case Candidate:
+			// raft.runCandidate()
 		}
 	}
 }

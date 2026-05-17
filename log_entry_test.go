@@ -8,7 +8,7 @@ import (
 func TestAppend(t *testing.T) {
 	log_entry := NewLogEntry()
 
-	log_entry.Append(Set, "name", "alice")
+	log_entry.Append(Set, "name", "alice", 0, 0)
 
 	if len(log_entry.entries) != 1 {
 		t.Fatalf("expected length 1 got %d", len(log_entry.entries))
@@ -24,7 +24,7 @@ func TestApplyLoop(t *testing.T) {
 
 	go server.ApplyLoop()
 
-	server.logEntry.Append(Set, "name", "alice")
+	server.logEntry.Append(Set, "name", "alice", 0, 0)
 
 	start := time.Now()
 	timeout := 1 * time.Second

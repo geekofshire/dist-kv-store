@@ -58,7 +58,7 @@ func (s *Server) Get(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) Delete(w http.ResponseWriter, r *http.Request) {
 	key := r.PathValue("key")
-	s.logEntry.Append(Delete, key, "")
+	s.logEntry.Append(Delete, key, "", 0, 0)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -78,7 +78,7 @@ func (s *Server) Set(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.logEntry.Append(Set, request.Key, request.Value)
+	s.logEntry.Append(Set, request.Key, request.Value, 0, 0)
 	w.WriteHeader(http.StatusCreated)
 }
 
