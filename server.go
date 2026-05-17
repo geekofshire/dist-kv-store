@@ -82,30 +82,6 @@ func (s *Server) Set(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 }
 
-func (s *Server) ApplyLoop() {
-	for {
-		l := s.logEntry
-		l.mu.Lock()
-
-		for l.applied >= len(l.entries) {
-			l.cond.Wait()
-		}
-
-		unapplied_entries := make([]Entry, len(l.entries[l.applied:]))
-		copy(unapplied_entries, l.entries[l.applied:])
-		start := l.applied
-		l.mu.Unlock()
-
-		for i, entry := range unapplied_entries {
-			s.store.ApplyLog(entry)
-
-			l.mu.Lock()
-			l.applied = l.applied + start + i
-			l.mu.Unlock()
-		}
-	}
-}
-
 func (s *Server) routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /get/{key}", s.Get)
 	mux.HandleFunc("POST /set", s.Set)

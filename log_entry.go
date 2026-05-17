@@ -31,20 +31,16 @@ type Entry struct {
 }
 
 type LogEntry struct {
-	mu   sync.Mutex
-	cond *sync.Cond
+	mu sync.Mutex
 
 	entries []Entry
 	applied int
 }
 
 func NewLogEntry() *LogEntry {
-	l := &LogEntry{
+	return &LogEntry{
 		entries: make([]Entry, 0),
 	}
-	l.cond = sync.NewCond(&l.mu)
-
-	return l
 }
 
 func (l *LogEntry) Append(cmd CommandType, key, value string, term, index int) {
@@ -53,5 +49,4 @@ func (l *LogEntry) Append(cmd CommandType, key, value string, term, index int) {
 
 	new_entry := Entry{Cmd: cmd, Key: key, Value: value, Index: index, Term: term}
 	l.entries = append(l.entries, new_entry)
-	l.cond.Signal()
 }

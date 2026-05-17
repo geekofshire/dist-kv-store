@@ -21,7 +21,7 @@ func main() {
 		WriteTimeout: 10 * time.Second,
 	}
 
-	go handler.ApplyLoop()
+	// go handler.ApplyLoop()
 
 	fmt.Println("listening on :8081")
 	srv.ListenAndServe()

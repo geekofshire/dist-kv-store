@@ -43,19 +43,26 @@ type RaftNode struct {
 
 func NewRaftNode(id string, peers []string) *RaftNode {
 	return &RaftNode{
-		id:         id,
-		peers:      peers,
-		role:       Follower,
-		log:        NewLogEntry(),
-		store:      NewStore(),
-		nextIndex:  make(map[string]int),
-		matchIndex: make(map[string]int),
+		id:              id,
+		peers:           peers,
+		role:            Follower,
+		log:             NewLogEntry(),
+		store:           NewStore(),
+		nextIndex:       make(map[string]int),
+		matchIndex:      make(map[string]int),
+		resetElectionCh: make(chan struct{}),
+		commitNotifyCh:  make(chan struct{}),
+		stopCh:          make(chan struct{}),
 	}
 }
 
-func (raftNode *RaftNode) run() {
+func (rf *RaftNode) run() {
+	rf.mu.Lock()
+	role := rf.role
+	rf.mu.Unlock()
+
 	for {
-		switch raftNode.role {
+		switch role {
 		case Follower:
 			// raftNode.runFollower()
 

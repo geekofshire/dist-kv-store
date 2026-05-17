@@ -18,8 +18,8 @@ func (rf *RaftNode) runFollower() {
 		case <-rf.resetElectionCh:
 			if !timeout.Stop() {
 				select {
-					case <-timeout.C:
-					default:
+				case <-timeout.C:
+				default:
 				}
 			}
 
@@ -58,6 +58,7 @@ func (rf *RaftNode) AppendEntries(
 
 	if leaderTerm > rf.currentTerm {
 		rf.currentTerm = leaderTerm
+		rf.votedFor = ""
 	}
 	rf.role = Follower
 
@@ -130,5 +131,31 @@ func (rf *RaftNode) notifyCommit() {
 	select {
 	case rf.commitNotifyCh <- struct{}{}:
 	default:
+	}
+}
+
+func (rf *RaftNode) ApplyLoop() {
+	for {
+		<-rf.commitNotifyCh
+
+		rf.mu.Lock()
+
+		if rf.commitIndex <= rf.lastApplied {
+			rf.mu.Unlock()
+			continue
+		}
+
+		entries := append(
+			[]Entry(nil),
+			rf.log.entries[rf.lastApplied+1:rf.commitIndex+1]...,
+		)
+
+		rf.lastApplied = rf.commitIndex
+
+		rf.mu.Unlock()
+
+		for _, entry := range entries {
+			rf.store.ApplyLog(entry)
+		}
 	}
 }
