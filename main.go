@@ -9,8 +9,8 @@ import (
 func main() {
 	mux := http.ServeMux{}
 	handler := &Server{
-		store:     NewStore(),
-		log_entry: NewLogEntry(),
+		store:    NewStore(),
+		logEntry: NewLogEntry(),
 	}
 
 	handler.routes(&mux)

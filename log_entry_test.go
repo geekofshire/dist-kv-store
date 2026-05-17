@@ -16,14 +16,15 @@ func TestAppend(t *testing.T) {
 }
 
 func TestApplyLoop(t *testing.T) {
+
 	server := &Server{
-		store:     NewStore(),
-		log_entry: NewLogEntry(),
+		store:    NewStore(),
+		logEntry: NewLogEntry(),
 	}
 
 	go server.ApplyLoop()
 
-	server.log_entry.Append(Set, "name", "alice")
+	server.logEntry.Append(Set, "name", "alice")
 
 	start := time.Now()
 	timeout := 1 * time.Second

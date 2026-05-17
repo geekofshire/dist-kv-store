@@ -8,8 +8,8 @@ import (
 )
 
 type Server struct {
-	store     *Store
-	log_entry *LogEntry
+	store    *Store
+	logEntry *LogEntry
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) error {
@@ -58,7 +58,7 @@ func (s *Server) Get(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) Delete(w http.ResponseWriter, r *http.Request) {
 	key := r.PathValue("key")
-	s.log_entry.Append(Delete, key, "")
+	s.logEntry.Append(Delete, key, "")
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -78,13 +78,13 @@ func (s *Server) Set(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.log_entry.Append(Set, request.Key, request.Value)
+	s.logEntry.Append(Set, request.Key, request.Value)
 	w.WriteHeader(http.StatusCreated)
 }
 
 func (s *Server) ApplyLoop() {
 	for {
-		l := s.log_entry
+		l := s.logEntry
 		l.mu.Lock()
 
 		for l.applied >= len(l.entries) {

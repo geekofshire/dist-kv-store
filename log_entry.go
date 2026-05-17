@@ -27,6 +27,7 @@ type Entry struct {
 	Key   string
 	Value string
 	Index int
+	Term  int
 }
 
 type LogEntry struct {

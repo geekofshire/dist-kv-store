@@ -9,8 +9,8 @@ import (
 
 func TestGetHandler(t *testing.T) {
 	server := &Server{
-		store:     NewStore(),
-		log_entry: NewLogEntry(),
+		store:    NewStore(),
+		logEntry: NewLogEntry(),
 	}
 	server.store.Set("name", "alice")
 
@@ -36,8 +36,8 @@ func TestGetHandler(t *testing.T) {
 
 func TestSetHandler(t *testing.T) {
 	server := &Server{
-		store:     NewStore(),
-		log_entry: NewLogEntry(),
+		store:    NewStore(),
+		logEntry: NewLogEntry(),
 	}
 
 	mux := http.NewServeMux()
@@ -62,8 +62,8 @@ func TestSetHandler(t *testing.T) {
 
 func TestDeleteHandler(t *testing.T) {
 	server := &Server{
-		store:     NewStore(),
-		log_entry: NewLogEntry(),
+		store:    NewStore(),
+		logEntry: NewLogEntry(),
 	}
 
 	mux := http.NewServeMux()
