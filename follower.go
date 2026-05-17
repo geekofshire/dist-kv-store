@@ -9,7 +9,7 @@ func randomElectionTimeout() time.Duration {
 	return time.Duration(150+rand.Intn(150)) * time.Millisecond
 }
 
-func (rf *RaftNode) runFollower() {
+func (rf *RaftNode) becomeFollower() {
 	timeout := time.NewTimer(randomElectionTimeout())
 	defer timeout.Stop()
 
@@ -58,7 +58,6 @@ func (rf *RaftNode) AppendEntries(
 
 	if leaderTerm > rf.currentTerm {
 		rf.currentTerm = leaderTerm
-		rf.votedFor = ""
 	}
 	rf.role = Follower
 

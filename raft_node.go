@@ -64,13 +64,13 @@ func (rf *RaftNode) run() {
 	for {
 		switch role {
 		case Follower:
-			// raftNode.runFollower()
+			rf.becomeFollower()
 
 		case Leader:
-			// raftNode.runLeader()
+			// rf.becomeLeader()
 
 		case Candidate:
-			// raft.runCandidate()
+			// rf.becomeCandidate()
 		}
 	}
 }
