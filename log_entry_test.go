@@ -1,8 +1,8 @@
 package main
 
 import (
-	"log"
 	"testing"
+	"time"
 )
 
 func TestAppend(t *testing.T) {
@@ -10,7 +10,33 @@ func TestAppend(t *testing.T) {
 
 	log_entry.Append(Set, "name", "alice")
 
-	if log_entry.applied != 0 {
-		log.Fatalf("expected index 0 got %d", log_entry.applied)
+	if len(log_entry.entries) != 1 {
+		t.Fatalf("expected length 1 got %d", len(log_entry.entries))
 	}
+}
+
+func TestApplyLoop(t *testing.T) {
+	server := &Server{
+		store:     NewStore(),
+		log_entry: NewLogEntry(),
+	}
+
+	go server.ApplyLoop()
+
+	server.log_entry.Append(Set, "name", "alice")
+
+	start := time.Now()
+	timeout := 1 * time.Second
+	interval := 5 * time.Millisecond
+
+	for time.Since(start) < timeout {
+		value, ok := server.store.Get("name")
+		if ok && value == "alice" {
+			return
+		}
+
+		time.Sleep(interval)
+	}
+
+	t.Fatalf("expected name key to be present")
 }
