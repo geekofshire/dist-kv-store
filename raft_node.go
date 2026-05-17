@@ -39,9 +39,11 @@ type RaftNode struct {
 	stopCh          chan struct{}
 
 	mu sync.RWMutex
+
+	transport Transport
 }
 
-func NewRaftNode(id string, peers []string) *RaftNode {
+func NewRaftNode(id string, peers []string, transport Transport) *RaftNode {
 	return &RaftNode{
 		id:              id,
 		peers:           peers,
@@ -53,15 +55,16 @@ func NewRaftNode(id string, peers []string) *RaftNode {
 		resetElectionCh: make(chan struct{}),
 		commitNotifyCh:  make(chan struct{}),
 		stopCh:          make(chan struct{}),
+		transport:       transport,
 	}
 }
 
 func (rf *RaftNode) run() {
-	rf.mu.Lock()
-	role := rf.role
-	rf.mu.Unlock()
-
 	for {
+		rf.mu.RLock()
+		role := rf.role
+		rf.mu.RUnlock()
+
 		switch role {
 		case Follower:
 			rf.becomeFollower()
@@ -70,7 +73,7 @@ func (rf *RaftNode) run() {
 			// rf.becomeLeader()
 
 		case Candidate:
-			// rf.becomeCandidate()
+			rf.becomeCandidate()
 		}
 	}
 }

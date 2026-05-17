@@ -7,27 +7,29 @@ import (
 
 type PersistentState struct {
 	CurrentTerm int
-	VotedFor string
-	Log *LogEntry
+	VotedFor    string
+	Entry       []Entry
 }
 
 func (rf *RaftNode) persist() error {
-    state := PersistentState{
-        CurrentTerm: rf.currentTerm,
-        VotedFor:    rf.votedFor,
-        Log:         rf.log,
-    }
+	state := PersistentState{
+		CurrentTerm: rf.currentTerm,
+		VotedFor:    rf.votedFor,
+		Entry:       rf.log.entries,
+	}
 
-    data, err := json.Marshal(state)
-    if err != nil {
-        return err
-    }
+	data, err := json.Marshal(state)
+	if err != nil {
+		return err
+	}
 
-    return os.WriteFile("raft_state.json", data, 0644)
+	fileName := rf.getPersistentFileName()
+	return os.WriteFile(fileName, data, 0644)
 }
 
 func (rf *RaftNode) restore() error {
-	data, err := os.ReadFile("raft_state.json")
+	fileName := rf.getPersistentFileName()
+	data, err := os.ReadFile(fileName)
 	if err != nil {
 		return err
 	}
@@ -40,7 +42,11 @@ func (rf *RaftNode) restore() error {
 
 	rf.currentTerm = state.CurrentTerm
 	rf.votedFor = state.VotedFor
-	rf.log = state.Log
+	rf.log.entries = state.Entry
 
 	return nil
+}
+
+func (rf *RaftNode) getPersistentFileName() string {
+	return "raft_state" + rf.id + ".json"
 }
