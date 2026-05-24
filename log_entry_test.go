@@ -1,19 +1,14 @@
 package main
 
-import (
-	"testing"
-	// "time"
-)
+// func TestAppend(t *testing.T) {
+// 	log_entry := NewLogEntry()
 
-func TestAppend(t *testing.T) {
-	log_entry := NewLogEntry()
+// 	log_entry.Append(Set, "name", "alice", 0, 0)
 
-	log_entry.Append(Set, "name", "alice", 0, 0)
-
-	if len(log_entry.entries) != 1 {
-		t.Fatalf("expected length 1 got %d", len(log_entry.entries))
-	}
-}
+// 	if len(log_entry.entries) != 1 {
+// 		t.Fatalf("expected length 1 got %d", len(log_entry.entries))
+// 	}
+// }
 
 /** func TestApplyLoop(t *testing.T) {
 

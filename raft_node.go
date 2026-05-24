@@ -21,7 +21,7 @@ type RaftNode struct {
 	// data that needs to be written to disk
 	currentTerm int
 	votedFor    string
-	log         *LogEntry
+	log         []Entry
 
 	// kv store
 	store *Store
@@ -51,7 +51,7 @@ func NewRaftNode(id string, peers []string, transport Transport) *RaftNode {
 		id:              id,
 		peers:           peers,
 		role:            Follower,
-		log:             NewLogEntry(),
+		log:             make([]Entry, 0, 100),
 		store:           NewStore(),
 		nextIndex:       make(map[string]int),
 		matchIndex:      make(map[string]int),
@@ -97,17 +97,17 @@ func (rf *RaftNode) transitionToLeader() {
 	defer rf.mu.Unlock()
 
 	lastLogIndex := func() int {
-		if len(rf.log.entries) == 0 {
+		if len(rf.log) == 0 {
 			return -1
 		}
-		return rf.log.entries[len(rf.log.entries)-1].Index
+		return rf.log[len(rf.log)-1].Index
 	}()
 
 	rf.role = Leader
 	rf.leaderID = rf.id
 	rf.votedFor = ""
 	for _, peer := range rf.peers {
-		rf.nextIndex[peer] = lastLogIndex
+		rf.nextIndex[peer] = lastLogIndex + 1
 		rf.matchIndex[peer] = -1
 	}
 }
@@ -119,4 +119,32 @@ func (rf *RaftNode) transitionToCandidate() {
 	rf.role = Candidate
 	rf.leaderID = ""
 	rf.votedFor = rf.id
+}
+
+func (rf *RaftNode) Append(cmd CommandType, key string, value string) {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	lastLogIndex := func() int {
+		if len(rf.log) == 0 {
+			return -1
+		}
+		return rf.log[len(rf.log)-1].Index
+	}()
+
+	entry := &Entry{
+		Cmd:   cmd,
+		Key:   key,
+		Value: value,
+		Term:  rf.currentTerm,
+		Index: lastLogIndex + 1,
+	}
+
+	lastLogIndex = lastLogIndex + 1
+
+	rf.log = append(rf.log, *entry)
+	rf.persist()
+
+	rf.matchIndex[rf.id] = lastLogIndex
+	rf.nextIndex[rf.id] = lastLogIndex + 1
 }

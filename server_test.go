@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func createServerInstance() (*Server) {
+func createServerInstance() *Server {
 	mt := NewMockTransport()
 
 	node1 := NewRaftNode("A", []string{"A", "B", "C"}, mt)

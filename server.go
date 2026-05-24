@@ -47,6 +47,7 @@ func (s *Server) Get(w http.ResponseWriter, r *http.Request) {
 	node, err := s.mt.getLeaderNode()
 	if err != nil {
 		http.Error(w, "can't handle the request at this moment", http.StatusServiceUnavailable)
+		return
 	}
 
 	value, ok := node.store.Get(key)
@@ -68,8 +69,8 @@ func (s *Server) Delete(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, "can't handle the request at this moment", http.StatusServiceUnavailable)
 	}
-	
-	node.log.Append(Delete, key, "", 0, 0)
+
+	node.Append(Delete, key, "")
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -94,7 +95,7 @@ func (s *Server) Set(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "can't handle the request at this moment", http.StatusServiceUnavailable)
 	}
 
-	node.log.Append(Set, request.Key, request.Value, 0, 0)
+	node.Append(Set, request.Key, request.Value)
 	w.WriteHeader(http.StatusCreated)
 }
 

@@ -9,13 +9,15 @@ type PersistentState struct {
 	CurrentTerm int
 	VotedFor    string
 	Entry       []Entry
+	LeaderID    string
 }
 
 func (rf *RaftNode) persist() error {
 	state := PersistentState{
 		CurrentTerm: rf.currentTerm,
 		VotedFor:    rf.votedFor,
-		Entry:       rf.log.entries,
+		Entry:       rf.log,
+		LeaderID:    rf.leaderID,
 	}
 
 	data, err := json.Marshal(state)
@@ -42,7 +44,8 @@ func (rf *RaftNode) restore() error {
 
 	rf.currentTerm = state.CurrentTerm
 	rf.votedFor = state.VotedFor
-	rf.log.entries = state.Entry
+	rf.log = state.Entry
+	rf.leaderID = state.LeaderID
 
 	return nil
 }

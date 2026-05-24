@@ -9,12 +9,13 @@ func (rf *RaftNode) runCandidate() {
 
 	rf.currentTerm += 1
 	rf.votedFor = rf.id
+	rf.persist()
 	rf.resetElectionTimer()
 	currentLastTerm := 0
 	currentLastIndex := 0
 
-	if len(rf.log.entries) > 0 {
-		last := rf.log.entries[len(rf.log.entries)-1]
+	if len(rf.log) > 0 {
+		last := rf.log[len(rf.log)-1]
 		currentLastTerm = last.Term
 		currentLastIndex = last.Index
 	}
@@ -60,6 +61,7 @@ func (rf *RaftNode) runCandidate() {
 		if result.Term > rf.currentTerm {
 			rf.currentTerm = result.Term
 			rf.mu.Unlock()
+			rf.persist()
 			rf.transitionToFollower()
 			break
 		}
@@ -106,8 +108,8 @@ func (rf *RaftNode) RequestVote(term int, candidateID string, lastLogIndex, last
 	currentLastTerm := 0
 	currentLastIndex := 0
 
-	if len(rf.log.entries) > 0 {
-		last := rf.log.entries[len(rf.log.entries)-1]
+	if len(rf.log) > 0 {
+		last := rf.log[len(rf.log)-1]
 		currentLastTerm = last.Term
 		currentLastIndex = last.Index
 	}
@@ -120,5 +122,6 @@ func (rf *RaftNode) RequestVote(term int, candidateID string, lastLogIndex, last
 
 	rf.votedFor = candidateID
 	rf.resetElectionTimer()
+	rf.persist()
 	return rf.currentTerm, true
 }

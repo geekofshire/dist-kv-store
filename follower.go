@@ -65,13 +65,13 @@ func (rf *RaftNode) AppendEntries(
 	if prevLogIndex >= 0 {
 
 		// some entries are missing
-		if prevLogIndex >= len(rf.log.entries) {
+		if prevLogIndex >= len(rf.log) {
 			term := rf.currentTerm
 			rf.mu.Unlock()
 			return term, false
 		}
 
-		if rf.log.entries[prevLogIndex].Term != prevLogTerm {
+		if rf.log[prevLogIndex].Term != prevLogTerm {
 			term := rf.currentTerm
 			rf.mu.Unlock()
 			return term, false
@@ -82,21 +82,23 @@ func (rf *RaftNode) AppendEntries(
 	for index, entry := range entries {
 		currentIndex := insertIndex + index
 
-		if currentIndex < len(rf.log.entries) {
-			if rf.log.entries[currentIndex].Term != entry.Term {
-				rf.log.entries = rf.log.entries[:currentIndex]
+		if currentIndex < len(rf.log) {
+			if rf.log[currentIndex].Term != entry.Term {
+				rf.log = rf.log[:currentIndex]
 
-				rf.log.entries = append(rf.log.entries, entries[index:]...)
+				rf.log = append(rf.log, entries[index:]...)
+				rf.persist()
 				break
 			}
 			continue
 		}
-		rf.log.entries = append(rf.log.entries, entries[index:]...)
+		rf.log = append(rf.log, entries[index:]...)
+		rf.persist()
 		break
 	}
 
 	if leaderCommit > rf.commitIndex {
-		lastIndex := len(rf.log.entries) - 1
+		lastIndex := len(rf.log) - 1
 		newCommitIndex := min(leaderCommit, lastIndex)
 
 		if newCommitIndex > rf.commitIndex {
@@ -147,8 +149,7 @@ func (rf *RaftNode) ApplyLoop() {
 		}
 
 		entries := append(
-			[]Entry(nil),
-			rf.log.entries[rf.lastApplied+1:rf.commitIndex+1]...,
+			[]Entry(nil), rf.log[rf.lastApplied+1:rf.commitIndex+1]...,
 		)
 
 		rf.lastApplied = rf.commitIndex

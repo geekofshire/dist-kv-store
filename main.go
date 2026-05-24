@@ -17,6 +17,17 @@ func main() {
 	mt.AppendNodes("B", node2)
 	mt.AppendNodes("C", node3)
 
+	node1.mu.Lock()
+	for _, peer := range node1.peers {
+		node, ok := mt.nodes[peer]
+		if !ok {
+			continue
+		}
+		go node.run()
+		go node.ApplyLoop()
+	}
+	node1.mu.Unlock()
+
 	mux := http.ServeMux{}
 	handler := &Server{
 		mt: mt,
@@ -29,8 +40,6 @@ func main() {
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 	}
-
-	
 
 	fmt.Println("listening on :8081")
 	srv.ListenAndServe()
