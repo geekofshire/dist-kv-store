@@ -9,7 +9,7 @@ func randomElectionTimeout() time.Duration {
 	return time.Duration(150+rand.Intn(150)) * time.Millisecond
 }
 
-func (rf *RaftNode) becomeFollower() {
+func (rf *RaftNode) runFollower() {
 	timeout := time.NewTimer(randomElectionTimeout())
 	defer timeout.Stop()
 
@@ -26,15 +26,14 @@ func (rf *RaftNode) becomeFollower() {
 			timeout.Reset(randomElectionTimeout())
 
 		case <-timeout.C:
-			rf.mu.Lock()
-			rf.role = Candidate
-			rf.mu.Unlock()
+			rf.transitionToCandidate()
 			return
 		}
 	}
 }
 
 func (rf *RaftNode) AppendEntries(
+	leaderID string,
 	leaderTerm int,
 	prevLogIndex int,
 	prevLogTerm int,
@@ -57,7 +56,9 @@ func (rf *RaftNode) AppendEntries(
 	}
 
 	if leaderTerm > rf.currentTerm {
+		rf.votedFor = ""
 		rf.currentTerm = leaderTerm
+		rf.persist()
 	}
 	rf.role = Follower
 
@@ -105,6 +106,7 @@ func (rf *RaftNode) AppendEntries(
 	}
 
 	term := rf.currentTerm
+	rf.leaderID = leaderID
 	shouldResetElection = true
 	rf.mu.Unlock()
 

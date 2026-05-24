@@ -15,6 +15,9 @@ type RaftNode struct {
 	peers []string // peer node addresses
 	role  Role
 
+	// volatile leaderID
+	leaderID string
+
 	// data that needs to be written to disk
 	currentTerm int
 	votedFor    string
@@ -56,6 +59,9 @@ func NewRaftNode(id string, peers []string, transport Transport) *RaftNode {
 		commitNotifyCh:  make(chan struct{}),
 		stopCh:          make(chan struct{}),
 		transport:       transport,
+		commitIndex:     -1,
+		lastApplied:     -1,
+		leaderID:        "",
 	}
 }
 
@@ -67,13 +73,50 @@ func (rf *RaftNode) run() {
 
 		switch role {
 		case Follower:
-			rf.becomeFollower()
+			rf.runFollower()
 
 		case Leader:
-			// rf.becomeLeader()
+			rf.runLeader()
 
 		case Candidate:
-			rf.becomeCandidate()
+			rf.runCandidate()
 		}
 	}
+}
+
+func (rf *RaftNode) transitionToFollower() {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	rf.role = Follower
+	rf.votedFor = ""
+}
+
+func (rf *RaftNode) transitionToLeader() {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	lastLogIndex := func() int {
+		if len(rf.log.entries) == 0 {
+			return -1
+		}
+		return rf.log.entries[len(rf.log.entries)-1].Index
+	}()
+
+	rf.role = Leader
+	rf.leaderID = rf.id
+	rf.votedFor = ""
+	for _, peer := range rf.peers {
+		rf.nextIndex[peer] = lastLogIndex
+		rf.matchIndex[peer] = -1
+	}
+}
+
+func (rf *RaftNode) transitionToCandidate() {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	rf.role = Candidate
+	rf.leaderID = ""
+	rf.votedFor = rf.id
 }

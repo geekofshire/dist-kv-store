@@ -1,19 +1,87 @@
 package main
 
-func (rf *RaftNode) becomeCandidate() {
+import (
+	"sync"
+)
+
+func (rf *RaftNode) runCandidate() {
 	rf.mu.Lock()
 
 	rf.currentTerm += 1
 	rf.votedFor = rf.id
 	rf.resetElectionTimer()
+	currentLastTerm := 0
+	currentLastIndex := 0
+
+	if len(rf.log.entries) > 0 {
+		last := rf.log.entries[len(rf.log.entries)-1]
+		currentLastTerm = last.Term
+		currentLastIndex = last.Index
+	}
+
+	request_vote_args := &RequestVoteArgs{
+		Term:         rf.currentTerm,
+		CandidateID:  rf.id,
+		LastLogIndex: currentLastIndex,
+		LastLogTerm:  currentLastTerm,
+	}
+
+	var wg sync.WaitGroup
+	results := make(chan RequestVoteReply, len(rf.peers))
 	rf.mu.Unlock()
 
-	// Transport layer here to receive votes
+	for _, peer := range rf.peers {
+		if peer == rf.id {
+			continue
+		}
 
-	votes := 3 // random number for now
-	if votes >= (len(rf.peers)/2)+1 {
-		rf.role = Leader
-		// sendAppendEntry to followers (in leader.go)
+		wg.Add(1)
+		go func(peer string) {
+			defer wg.Done()
+
+			resp, err := rf.transport.RequestVote(peer, *request_vote_args)
+			if err != nil {
+				return
+			}
+
+			results <- resp
+		}(peer)
+	}
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	voteCount := 1 // self-vote included
+	for result := range results {
+		rf.mu.Lock()
+
+		if result.Term > rf.currentTerm {
+			rf.currentTerm = result.Term
+			rf.mu.Unlock()
+			rf.transitionToFollower()
+			break
+		}
+
+		if !result.VoteGranted {
+			rf.mu.Unlock()
+			continue
+		}
+
+		voteCount += 1
+		if voteCount >= (len(rf.peers)/2)+1 {
+			if rf.role != Candidate {
+				rf.mu.Unlock()
+				break
+			}
+			rf.mu.Unlock()
+			//majority granted, become leader
+			rf.transitionToLeader()
+			break
+		}
+
+		rf.mu.Unlock()
 	}
 }
 

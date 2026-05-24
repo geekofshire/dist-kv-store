@@ -19,8 +19,7 @@ func main() {
 
 	mux := http.ServeMux{}
 	handler := &Server{
-		store:    NewStore(),
-		logEntry: NewLogEntry(),
+		mt: mt,
 	}
 
 	handler.routes(&mux)
@@ -31,7 +30,7 @@ func main() {
 		WriteTimeout: 10 * time.Second,
 	}
 
-	// go handler.ApplyLoop()
+	
 
 	fmt.Println("listening on :8081")
 	srv.ListenAndServe()

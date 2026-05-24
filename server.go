@@ -8,8 +8,7 @@ import (
 )
 
 type Server struct {
-	store    *Store
-	logEntry *LogEntry
+	mt *MockTransport
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) error {
@@ -44,13 +43,19 @@ func (s *Server) Get(w http.ResponseWriter, r *http.Request) {
 		Value string `json:"value"`
 	}
 
-	value, ok := s.store.Get(key)
+	// for now read uses leader node.
+	node, err := s.mt.getLeaderNode()
+	if err != nil {
+		http.Error(w, "can't handle the request at this moment", http.StatusServiceUnavailable)
+	}
+
+	value, ok := node.store.Get(key)
 	if !ok {
 		http.Error(w, "key not found", http.StatusNotFound)
 		return
 	}
 
-	err := writeJSON(w, http.StatusOK, &response{Key: key, Value: value})
+	err = writeJSON(w, http.StatusOK, &response{Key: key, Value: value})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -58,7 +63,13 @@ func (s *Server) Get(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) Delete(w http.ResponseWriter, r *http.Request) {
 	key := r.PathValue("key")
-	s.logEntry.Append(Delete, key, "", 0, 0)
+
+	node, err := s.mt.getLeaderNode()
+	if err != nil {
+		http.Error(w, "can't handle the request at this moment", http.StatusServiceUnavailable)
+	}
+	
+	node.log.Append(Delete, key, "", 0, 0)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -78,7 +89,12 @@ func (s *Server) Set(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.logEntry.Append(Set, request.Key, request.Value, 0, 0)
+	node, err := s.mt.getLeaderNode()
+	if err != nil {
+		http.Error(w, "can't handle the request at this moment", http.StatusServiceUnavailable)
+	}
+
+	node.log.Append(Set, request.Key, request.Value, 0, 0)
 	w.WriteHeader(http.StatusCreated)
 }
 

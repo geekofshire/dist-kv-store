@@ -30,6 +30,7 @@ type RequestVoteReply struct {
 }
 
 type AppendEntriesArgs struct {
+	LeaderID     string
 	LeaderTerm   int
 	PrevLogIndex int
 	PrevLogTerm  int
@@ -58,6 +59,23 @@ func (mt *MockTransport) AppendNodes(nodeID string, node *RaftNode) {
 	defer mt.mu.Unlock()
 
 	mt.nodes[nodeID] = node
+}
+
+func (mt *MockTransport) getLeaderNode() (*RaftNode, error) {
+	mt.mu.Lock()
+	defer mt.mu.Unlock()
+
+	for _, node := range mt.nodes {
+		node.mu.Lock()
+		if node.role == Leader {
+			node.mu.Unlock()
+			return node, nil
+		}
+		node.mu.Unlock()
+		continue
+	}
+
+	return nil, fmt.Errorf("No leader node found")
 }
 
 func (mt *MockTransport) RequestVote(
@@ -100,6 +118,7 @@ func (mt *MockTransport) AppendEntries(
 	}
 
 	term, success := node.AppendEntries(
+		args.LeaderID,
 		args.LeaderTerm,
 		args.PrevLogIndex,
 		args.PrevLogTerm,

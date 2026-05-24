@@ -7,12 +7,33 @@ import (
 	"testing"
 )
 
-func TestGetHandler(t *testing.T) {
+func createServerInstance() (*Server) {
+	mt := NewMockTransport()
+
+	node1 := NewRaftNode("A", []string{"A", "B", "C"}, mt)
+	node2 := NewRaftNode("B", []string{"A", "B", "C"}, mt)
+	node3 := NewRaftNode("C", []string{"A", "B", "C"}, mt)
+
+	mt.AppendNodes("A", node1)
+	mt.AppendNodes("B", node2)
+	mt.AppendNodes("C", node3)
+
+	node1.transitionToLeader()
+
 	server := &Server{
-		store:    NewStore(),
-		logEntry: NewLogEntry(),
+		mt: mt,
 	}
-	server.store.Set("name", "alice")
+
+	return server
+}
+
+func TestGetHandler(t *testing.T) {
+	server := createServerInstance()
+	node, err := server.mt.getLeaderNode()
+	if err != nil {
+		t.Fatalf("leader node not working")
+	}
+	node.store.Set("name", "alice")
 
 	mux := http.NewServeMux()
 	server.routes(mux)
@@ -35,10 +56,7 @@ func TestGetHandler(t *testing.T) {
 }
 
 func TestSetHandler(t *testing.T) {
-	server := &Server{
-		store:    NewStore(),
-		logEntry: NewLogEntry(),
-	}
+	server := createServerInstance()
 
 	mux := http.NewServeMux()
 	server.routes(mux)
@@ -61,15 +79,16 @@ func TestSetHandler(t *testing.T) {
 }
 
 func TestDeleteHandler(t *testing.T) {
-	server := &Server{
-		store:    NewStore(),
-		logEntry: NewLogEntry(),
-	}
+	server := createServerInstance()
 
 	mux := http.NewServeMux()
 	server.routes(mux)
 
-	server.store.Set("name", "alice")
+	node, err := server.mt.getLeaderNode()
+	if err != nil {
+		t.Fatalf("leader node not working")
+	}
+	node.store.Set("name", "alice")
 
 	req := httptest.NewRequest(
 		http.MethodDelete,
