@@ -51,5 +51,5 @@ func (rf *RaftNode) restore() error {
 }
 
 func (rf *RaftNode) getPersistentFileName() string {
-	return "raft_state" + rf.id + ".json"
+	return "raft_state_" + rf.id + ".json"
 }

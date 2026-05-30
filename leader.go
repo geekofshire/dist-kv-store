@@ -22,12 +22,12 @@ func (rf *RaftNode) runLeader() {
 				}
 
 				next := rf.nextIndex[peer]
-				next = min(0, next)
-				next = max(next, len(rf.log) - 1)
-				
+				next = max(0, next)
+				next = min(next, len(rf.log)-1)
+
 				prevIndex := next - 1
 
-				prevTerm := func() int{
+				prevTerm := func() int {
 					if prevIndex <= -1 {
 						return 0
 					}
@@ -86,7 +86,7 @@ func (rf *RaftNode) runLeader() {
 						go rf.tryAdvanceCommitIndex()
 						return
 					} else {
-						rf.nextIndex[peer] = max(0, rf.nextIndex[peer] - 1)
+						rf.nextIndex[peer] = max(0, rf.nextIndex[peer]-1)
 					}
 
 					rf.mu.Unlock()
@@ -105,7 +105,7 @@ func (rf *RaftNode) tryAdvanceCommitIndex() {
 			return -1
 		}
 
-		return rf.log[len(rf.log) - 1].Index
+		return rf.log[len(rf.log)-1].Index
 	}()
 
 	for n := lastLogIndex; n > rf.commitIndex; n-- {
@@ -117,7 +117,7 @@ func (rf *RaftNode) tryAdvanceCommitIndex() {
 		count := 0
 		for id, val := range rf.matchIndex {
 			if val >= n || rf.id == id {
-				count ++
+				count++
 			}
 		}
 
