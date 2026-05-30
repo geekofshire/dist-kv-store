@@ -291,3 +291,176 @@ func TestAppendEntriesAdvancesCommitIndexFromLeaderCommit(t *testing.T) {
 		return getCommitIndex(follower) == 2
 	})
 }
+
+func TestTransitionToLeaderAdvancesNextIndex(t *testing.T) {
+	nodes, _ := newTestCluster(t, []string{"leader", "follower"})
+
+	leader := nodes[0]
+	appendTestEntry(leader, 1, Set, "x", "1")
+	appendTestEntry(leader, 1, Set, "y", "2")
+
+	leader.transitionToLeader()
+
+	for _, peer := range leader.peers {
+		// checking against 2 since we are using 0 based indexing
+		if leader.nextIndex[peer] != 2 {
+			t.Fatalf("expected next index for %s to be %d got %d", peer, 2, leader.nextIndex[peer])
+		}
+	}
+}
+
+func TestTransitionToLeaderInitializeMatchIndex(t *testing.T) {
+	nodes, _ := newTestCluster(t, []string{"leader", "follower"})
+
+	leader := nodes[0]
+	appendTestEntry(leader, 1, Set, "x", "1")
+	appendTestEntry(leader, 1, Set, "y", "2")
+
+	leader.transitionToLeader()
+
+	for _, peer := range leader.peers {
+		_, ok := leader.matchIndex[peer]
+		if !ok {
+			t.Fatal("expected match index to be initialized for leaders")
+		}
+	}
+}
+
+func TestFailedAppendEntriesReplyDecrementNextIndex(t *testing.T) {
+	nodes, _ := newTestCluster(t, []string{"leader", "follower"})
+
+	leader := nodes[0]
+
+	leader.transitionToLeader()
+	leader.mu.Lock()
+	leader.nextIndex["follower"] = 5
+
+	// mock args & response
+	args := AppendEntriesArgs{
+		LeaderTerm: leader.currentTerm,
+	}
+
+	resp := AppendEntriesReply {
+		Success: false,
+	}
+
+	leader.mu.Unlock()
+
+	leader.handleAppendEntriesReply("follower", args, resp)
+
+	leader.mu.RLock()
+	defer leader.mu.RUnlock()
+
+	if leader.nextIndex["follower"] != 4 {
+		t.Fatalf("got %d expected %d", leader.nextIndex["follower"], 4)
+	}
+}
+
+func TestSuccessfulAppendEntriesUpdateMatchAndNextIndex(t *testing.T) {
+	nodes, _ := newTestCluster(t, []string{"leader", "follower"})
+
+	leader := nodes[0]
+	follower := nodes[1]
+
+	appendTestEntry(leader, 1, Set, "a", "1")
+	appendTestEntry(leader, 1, Set, "b", "2")
+	appendTestEntry(leader, 1, Set, "c", "3")
+
+	appendTestEntry(follower, 1, Set, "a", "1")
+	appendTestEntry(follower, 1, Set, "b", "2")
+
+	leader.mu.Lock()
+	leader.role = Leader
+	leader.currentTerm = 1
+	leader.matchIndex["follower"] = 1
+	leader.nextIndex["follower"] = 2
+	leader.mu.Unlock()
+
+	args := makeAppendEntriesArgs(t, leader, follower)
+
+	resp := appendEntries(t, leader, follower, args)
+	
+	leader.handleAppendEntriesReply("follower", args, resp)
+
+	if leader.matchIndex["follower"] != 2 {
+		t.Fatalf("expected match index to be %d got %d", 2, leader.matchIndex["follower"])
+	}
+
+	if leader.nextIndex["follower"] != 3 {
+		t.Fatalf("expected next index to be %d got %d", 3, leader.nextIndex["follower"])
+	}
+}
+
+
+func TestTryAdvanceCommitIndexNoMajority(t *testing.T) {
+	nodes, _ := newTestCluster(t, []string{"leader", "f1", "f2"})
+
+	leader := nodes[0]
+
+	appendTestEntry(leader, 0, Set, "x", "1")
+
+	leader.transitionToLeader()
+	leader.mu.Lock()
+	leader.commitIndex = -1
+	leader.matchIndex["f1"] = -1
+	leader.matchIndex["f2"] = -1
+	leader.mu.Unlock()
+
+	leader.tryAdvanceCommitIndex()
+
+	leader.mu.RLock()
+	defer leader.mu.RUnlock()
+
+	if leader.commitIndex != -1 {
+		t.Fatalf("expected commit index to be %d got %d", -1, leader.commitIndex)
+	}
+}
+
+func TestTryAdvanceCommitIndexWithMajority(t *testing.T) {
+	nodes, _ := newTestCluster(t, []string{"leader", "f1", "f2"})
+
+	leader := nodes[0]
+
+	appendTestEntry(leader, 0, Set, "x", "1")
+
+	leader.transitionToLeader()
+	leader.mu.Lock()
+	leader.commitIndex = -1
+	leader.matchIndex["f1"] = 0
+	leader.matchIndex["f2"] = -1
+	leader.mu.Unlock()
+
+	leader.tryAdvanceCommitIndex()
+
+	leader.mu.RLock()
+	defer leader.mu.RUnlock()
+
+	if leader.commitIndex != 0 {
+		t.Fatalf("expected commit index to be %d got %d", -1, leader.commitIndex)
+	}
+}
+
+func TestTryAdvanceCommitIndexSkipsOldTermEntries(t *testing.T) {
+	nodes, _ := newTestCluster(t, []string{"leader", "f1", "f2"})
+
+	leader := nodes[0]
+
+	appendTestEntry(leader, 0, Set, "x", "1")
+
+	leader.transitionToLeader()
+	leader.mu.Lock()
+	leader.currentTerm = 2
+	leader.commitIndex = -1
+	leader.matchIndex["f1"] = 0
+	leader.matchIndex["f2"] = 0
+	leader.mu.Unlock()
+
+	leader.tryAdvanceCommitIndex()
+
+	leader.mu.RLock()
+	defer leader.mu.RUnlock()
+
+	if leader.commitIndex != -1 {
+		t.Fatalf("expected commit index to be %d got %d", -1, leader.commitIndex)
+	}
+}

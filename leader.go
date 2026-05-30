@@ -23,7 +23,7 @@ func (rf *RaftNode) runLeader() {
 
 				next := rf.nextIndex[peer]
 				next = max(0, next)
-				next = min(next, len(rf.log)-1)
+				next = min(next, len(rf.log))
 
 				prevIndex := next - 1
 
@@ -63,33 +63,7 @@ func (rf *RaftNode) runLeader() {
 						return
 					}
 
-					rf.mu.Lock()
-					currentTerm := rf.currentTerm
-
-					if resp.Term > currentTerm {
-						rf.currentTerm = resp.Term
-						rf.mu.Unlock()
-						rf.transitionToFollower()
-						rf.persist()
-						return
-					}
-
-					if rf.role != Leader || args.LeaderTerm != currentTerm {
-						rf.mu.Unlock()
-						return
-					}
-
-					if resp.Success {
-						rf.matchIndex[peer] = prevIndex + len(args.Entries)
-						rf.nextIndex[peer] = rf.matchIndex[peer] + 1
-						rf.mu.Unlock()
-						go rf.tryAdvanceCommitIndex()
-						return
-					} else {
-						rf.nextIndex[peer] = max(0, rf.nextIndex[peer]-1)
-					}
-
-					rf.mu.Unlock()
+					rf.handleAppendEntriesReply(peer, args, resp)
 
 				}(peer, args)
 			}
@@ -114,9 +88,13 @@ func (rf *RaftNode) tryAdvanceCommitIndex() {
 		}
 
 		majority := (len(rf.peers) / 2) + 1
-		count := 0
-		for id, val := range rf.matchIndex {
-			if val >= n || rf.id == id {
+		count := 1
+		for peer, match := range rf.matchIndex {
+			if peer == rf.id {
+				continue
+			}
+
+			if match >= n {
 				count++
 			}
 		}
@@ -129,4 +107,31 @@ func (rf *RaftNode) tryAdvanceCommitIndex() {
 	}
 
 	rf.mu.Unlock()
+}
+
+func (rf *RaftNode) handleAppendEntriesReply(peer string, args AppendEntriesArgs, resp AppendEntriesReply) {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	currentTerm := rf.currentTerm
+
+	if resp.Term > currentTerm {
+		rf.currentTerm = resp.Term
+		rf.transitionToFollower()
+		rf.persist()
+		return
+	}
+
+	if rf.role != Leader || args.LeaderTerm != currentTerm {
+		return
+	}
+
+	if resp.Success {
+		rf.matchIndex[peer] = args.PrevLogIndex + len(args.Entries)
+		rf.nextIndex[peer] = rf.matchIndex[peer] + 1
+		go rf.tryAdvanceCommitIndex()
+		return
+	} else {
+		rf.nextIndex[peer] = max(0, rf.nextIndex[peer]-1)
+	}
 }
