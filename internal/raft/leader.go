@@ -118,7 +118,7 @@ func (rf *RaftNode) handleAppendEntriesReply(peer string, args AppendEntriesArgs
 
 	if resp.Term > currentTerm {
 		rf.currentTerm = resp.Term
-		rf.persist()
+		rf.persistLocked()
 		rf.mu.Unlock()
 		rf.transitionToFollower()
 		return

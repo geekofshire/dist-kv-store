@@ -62,7 +62,7 @@ func (rf *RaftNode) AppendEntries(
 	if leaderTerm > rf.currentTerm {
 		rf.votedFor = ""
 		rf.currentTerm = leaderTerm
-		rf.persist()
+		rf.persistLocked()
 	}
 	rf.role = Follower
 
@@ -91,13 +91,13 @@ func (rf *RaftNode) AppendEntries(
 				rf.log = rf.log[:currentIndex]
 
 				rf.log = append(rf.log, entries[index:]...)
-				rf.persist()
+				rf.persistLocked()
 				break
 			}
 			continue
 		}
 		rf.log = append(rf.log, entries[index:]...)
-		rf.persist()
+		rf.persistLocked()
 		break
 	}
 

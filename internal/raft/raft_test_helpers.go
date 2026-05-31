@@ -9,10 +9,12 @@ func newTestCluster(t *testing.T, ids []string) ([]*RaftNode, Transport) {
 	t.Helper()
 
 	mt := NewMockTransport()
+	dataDir := t.TempDir()
 	var nodes []*RaftNode
 
 	for _, id := range ids {
 		node := NewRaftNode(id, ids, mt)
+		node.SetDataDir(dataDir)
 		mt.AppendNodes(id, node)
 		nodes = append(nodes, node)
 	}

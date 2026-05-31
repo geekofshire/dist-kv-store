@@ -9,7 +9,7 @@ func (rf *RaftNode) runCandidate() {
 
 	rf.currentTerm += 1
 	rf.votedFor = rf.id
-	rf.persist()
+	rf.persistLocked()
 	rf.mu.Unlock()
 	rf.resetElectionTimer()
 	rf.mu.Lock()
@@ -86,7 +86,7 @@ func (rf *RaftNode) runCandidate() {
 			if result.Term > rf.currentTerm {
 				rf.currentTerm = result.Term
 				rf.votedFor = ""
-				rf.persist()
+				rf.persistLocked()
 				rf.mu.Unlock()
 				rf.transitionToFollower()
 				return
@@ -148,6 +148,6 @@ func (rf *RaftNode) RequestVote(term int, candidateID string, lastLogIndex, last
 
 	rf.votedFor = candidateID
 	rf.resetElectionTimer()
-	rf.persist()
+	rf.persistLocked()
 	return rf.currentTerm, true
 }

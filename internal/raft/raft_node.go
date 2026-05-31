@@ -48,6 +48,7 @@ type RaftNode struct {
 	mu sync.RWMutex
 
 	transport Transport
+	dataDir   string
 }
 
 func NewRaftNode(id string, peers []string, transport Transport) *RaftNode {
@@ -63,6 +64,7 @@ func NewRaftNode(id string, peers []string, transport Transport) *RaftNode {
 		commitNotifyCh:  make(chan struct{}, 2),
 		stopCh:          make(chan struct{}),
 		transport:       transport,
+		dataDir:         "disk_store",
 		commitIndex:     -1,
 		lastApplied:     -1,
 		leaderID:        "",
@@ -151,7 +153,7 @@ func (rf *RaftNode) Append(cmd CommandType, key string, value string) {
 	lastLogIndex = lastLogIndex + 1
 
 	rf.log = append(rf.log, *entry)
-	rf.persist()
+	rf.persistLocked()
 
 	rf.matchIndex[rf.id] = lastLogIndex
 	rf.nextIndex[rf.id] = lastLogIndex + 1
@@ -163,6 +165,13 @@ func (rf *RaftNode) Get(key string) (string, bool) {
 
 func (rf *RaftNode) SetLocal(key, value string) {
 	rf.store.Set(key, value)
+}
+
+func (rf *RaftNode) SetDataDir(dataDir string) {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	rf.dataDir = dataDir
 }
 
 func (rf *RaftNode) ForceLeader() {
