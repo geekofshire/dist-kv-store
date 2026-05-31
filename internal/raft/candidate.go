@@ -23,7 +23,7 @@ func (rf *RaftNode) runCandidate() {
 		currentLastIndex = last.Index
 	}
 
-	request_vote_args := RequestVoteArgs{
+	requestVoteArgs := RequestVoteArgs{
 		Term:         rf.currentTerm,
 		CandidateID:  rf.id,
 		LastLogIndex: currentLastIndex,
@@ -43,7 +43,7 @@ func (rf *RaftNode) runCandidate() {
 		go func(peer string) {
 			defer wg.Done()
 
-			resp, err := rf.transport.RequestVote(peer, request_vote_args)
+			resp, err := rf.transport.RequestVote(peer, requestVoteArgs)
 			if err != nil {
 				return
 			}

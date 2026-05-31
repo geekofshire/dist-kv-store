@@ -34,10 +34,9 @@ type RaftNode struct {
 	commitIndex int
 	lastApplied int
 
-	// for each server index of the log_entry sent
+	// for each server, index of the next log entry to send
 	nextIndex map[string]int
-	// for each server index of the
-	// highest log_entry known to be commited
+	// for each server, highest log entry known to be committed
 	matchIndex map[string]int
 
 	// channels to change state or notify

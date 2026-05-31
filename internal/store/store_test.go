@@ -22,7 +22,7 @@ func TestStoreDelete(t *testing.T) {
 	store := NewStore()
 	store.Set("name", "alice")
 
-	var delete_test_cases = []struct {
+	var deleteTestCases = []struct {
 		key string
 		ok  bool
 	}{
@@ -30,7 +30,7 @@ func TestStoreDelete(t *testing.T) {
 		{"alice", false},
 	}
 
-	for _, tt := range delete_test_cases {
+	for _, tt := range deleteTestCases {
 		t.Run(tt.key, func(t *testing.T) {
 			ok := store.Delete(tt.key)
 			if ok != tt.ok {
