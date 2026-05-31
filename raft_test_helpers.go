@@ -36,7 +36,7 @@ func waitUntil(t *testing.T, timeout time.Duration, condition func() bool) {
 			return
 		}
 
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 	}
 
 	t.Fatal("condition not met before timeout")

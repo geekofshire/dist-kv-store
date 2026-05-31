@@ -23,7 +23,7 @@ func TestRequestVoteRejectsStaleTerm(t *testing.T) {
 	}
 }
 
-func TestRequestVoteGrantsFreshTerm(t *testing.T) {
+func TestRequestVoteGrantsCurrentTerm(t *testing.T) {
 	nodes, _ := newTestCluster(t, []string{"leader", "follower"})
 
 	leader := nodes[0]
@@ -86,9 +86,11 @@ func TestRequestVoteAllowsDuplicateForSameCandidate(t *testing.T) {
 		t.Fatal("expected vote to be granted")
 	}
 
+	leader.mu.RLock()
 	if resp.Term != leader.currentTerm {
 		t.Fatalf("expected term to be updated, got %d want %d", leader.currentTerm, resp.Term)
 	}
+	leader.mu.RUnlock()
 
 	resp = requestVote(t, leader, follower)
 
@@ -96,6 +98,8 @@ func TestRequestVoteAllowsDuplicateForSameCandidate(t *testing.T) {
 		t.Fatal("expected vote to be granted second time too")
 	}
 
+	leader.mu.RLock()
+	defer leader.mu.RUnlock()
 	if resp.Term != leader.currentTerm {
 		t.Fatalf("expected term to be updated, got %d want %d", leader.currentTerm, resp.Term)
 	}
@@ -166,6 +170,7 @@ func TestAppendEntriesRejectMismatchTerm(t *testing.T) {
 	appendTestEntry(leader, 2, Set, "x", "1")
 	appendTestEntry(leader, 2, Set, "y", "2")
 	appendTestEntry(follower, 1, Set, "x", "1")
+	appendTestEntry(follower, 1, Set, "y", "2")
 
 	leader.mu.Lock()
 	leader.currentTerm = 2
@@ -176,7 +181,7 @@ func TestAppendEntriesRejectMismatchTerm(t *testing.T) {
 		LeaderID:     leader.id,
 		LeaderTerm:   leader.currentTerm,
 		PrevLogIndex: 1,
-		PrevLogTerm:  1,
+		PrevLogTerm:  2,
 		Entries:      []Entry{},
 		LeaderCommit: leader.commitIndex,
 	}
@@ -301,6 +306,8 @@ func TestTransitionToLeaderAdvancesNextIndex(t *testing.T) {
 
 	leader.transitionToLeader()
 
+	leader.mu.RLock()
+	defer leader.mu.RUnlock()
 	for _, peer := range leader.peers {
 		// checking against 2 since we are using 0 based indexing
 		if leader.nextIndex[peer] != 2 {
@@ -340,7 +347,7 @@ func TestFailedAppendEntriesReplyDecrementNextIndex(t *testing.T) {
 		LeaderTerm: leader.currentTerm,
 	}
 
-	resp := AppendEntriesReply {
+	resp := AppendEntriesReply{
 		Success: false,
 	}
 
@@ -379,7 +386,7 @@ func TestSuccessfulAppendEntriesUpdateMatchAndNextIndex(t *testing.T) {
 	args := makeAppendEntriesArgs(t, leader, follower)
 
 	resp := appendEntries(t, leader, follower, args)
-	
+
 	leader.handleAppendEntriesReply("follower", args, resp)
 
 	if leader.matchIndex["follower"] != 2 {
@@ -390,7 +397,6 @@ func TestSuccessfulAppendEntriesUpdateMatchAndNextIndex(t *testing.T) {
 		t.Fatalf("expected next index to be %d got %d", 3, leader.nextIndex["follower"])
 	}
 }
-
 
 func TestTryAdvanceCommitIndexNoMajority(t *testing.T) {
 	nodes, _ := newTestCluster(t, []string{"leader", "f1", "f2"})
@@ -436,7 +442,7 @@ func TestTryAdvanceCommitIndexWithMajority(t *testing.T) {
 	defer leader.mu.RUnlock()
 
 	if leader.commitIndex != 0 {
-		t.Fatalf("expected commit index to be %d got %d", -1, leader.commitIndex)
+		t.Fatalf("expected commit index to be %d got %d", 0, leader.commitIndex)
 	}
 }
 
@@ -463,4 +469,139 @@ func TestTryAdvanceCommitIndexSkipsOldTermEntries(t *testing.T) {
 	if leader.commitIndex != -1 {
 		t.Fatalf("expected commit index to be %d got %d", -1, leader.commitIndex)
 	}
+}
+
+func TestLeaderReplicatesEntryToFollower(t *testing.T) {
+	nodes, _ := newTestCluster(t, []string{"leader", "follower"})
+
+	leader := nodes[0]
+	follower := nodes[1]
+
+	leader.transitionToLeader()
+	appendTestEntry(leader, 0, Set, "x", "1")
+	follower.transitionToFollower()
+
+	go leader.runLeader()
+
+	t.Cleanup(func() {
+		close(leader.stopCh)
+	})
+
+	waitUntil(
+		t,
+		2*time.Second,
+		func() bool {
+			follower.mu.RLock()
+			defer follower.mu.RUnlock()
+			return len(follower.log) == 1
+		},
+	)
+
+	follower.mu.RLock()
+	defer follower.mu.RUnlock()
+
+	leader.mu.RLock()
+	defer leader.mu.RUnlock()
+
+	if leader.matchIndex["follower"] != 0 {
+		t.Fatal("matchIndex not updated")
+	}
+
+	if leader.nextIndex["follower"] != 1 {
+		t.Fatal("nextIndex not updated")
+	}
+
+	lastFollowerLog := follower.log[len(follower.log)-1]
+
+	if lastFollowerLog.Key != "x" || lastFollowerLog.Value != "1" || lastFollowerLog.Cmd != Set {
+		t.Fatal("log not replicated successfully")
+	}
+}
+
+func TestLeaderCommitsAfterMajorityReplication(t *testing.T) {
+	nodes, _ := newTestCluster(t, []string{"leader", "f1", "f2"})
+
+	leader := nodes[0]
+	f1 := nodes[1]
+
+	leader.transitionToLeader()
+	appendTestEntry(leader, 0, Set, "x", "1")
+
+	args := makeAppendEntriesArgs(t, leader, f1)
+
+	resp := appendEntries(t, leader, f1, args)
+
+	leader.handleAppendEntriesReply("f1", args, resp)
+
+	waitUntil(t, 1*time.Second, func() bool {
+		leader.mu.RLock()
+		defer leader.mu.RUnlock()
+
+		return leader.commitIndex == 0
+	})
+}
+
+func TestCommittedEntryAppliesToLeaderStore(t *testing.T) {
+	nodes, _ := newTestCluster(t, []string{"leader", "follower"})
+
+	leader := nodes[0]
+	follower := nodes[1]
+
+	leader.transitionToLeader()
+	appendTestEntry(leader, leader.currentTerm, Set, "x", "1")
+	follower.transitionToFollower()
+
+	go leader.runLeader()
+	go leader.ApplyLoop()
+
+	t.Cleanup(func() {
+		close(leader.stopCh)
+	})
+
+	waitUntil(t, 2*time.Second, func() bool {
+		leader.mu.RLock()
+		defer leader.mu.RUnlock()
+
+		val, ok := leader.store.Get("x")
+
+		return ok && val == "1"
+	})
+}
+
+func TestFollowerAppliesLeaderCommit(t *testing.T) {
+	nodes, _ := newTestCluster(t, []string{"leader", "follower"})
+
+	leader := nodes[0]
+	follower := nodes[1]
+
+	leader.transitionToLeader()
+	appendTestEntry(leader, leader.currentTerm, Set, "x", "1")
+
+	follower.transitionToFollower()
+	appendTestEntry(follower, leader.currentTerm, Set, "x", "1")
+	go follower.ApplyLoop()
+
+	t.Cleanup(func() {
+		close(follower.stopCh)
+	})
+
+	leader.mu.Lock()
+	leader.commitIndex = 0
+	leader.mu.Unlock()
+
+	args := makeAppendEntriesArgs(t, leader, follower)
+
+	resp := appendEntries(t, leader, follower, args)
+	if !resp.Success {
+		t.Fatal("expected append success")
+	}
+
+	waitUntil(t, 2*time.Second, func() bool {
+		follower.mu.RLock()
+		defer follower.mu.RUnlock()
+
+		val, ok := follower.store.Get("x")
+
+		return ok && val == "1"
+	})
 }

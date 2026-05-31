@@ -15,6 +15,10 @@ func (rf *RaftNode) runFollower() {
 
 	for {
 		select {
+
+		case <-rf.stopCh:
+			return
+
 		case <-rf.resetElectionCh:
 			if !timeout.Stop() {
 				select {

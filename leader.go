@@ -101,7 +101,9 @@ func (rf *RaftNode) tryAdvanceCommitIndex() {
 
 		if count >= majority {
 			rf.commitIndex = n
+			rf.mu.Unlock()
 			rf.notifyCommit()
+			rf.mu.Lock()
 			break
 		}
 	}
@@ -111,11 +113,11 @@ func (rf *RaftNode) tryAdvanceCommitIndex() {
 
 func (rf *RaftNode) handleAppendEntriesReply(peer string, args AppendEntriesArgs, resp AppendEntriesReply) {
 	rf.mu.Lock()
-	defer rf.mu.Unlock()
 
 	currentTerm := rf.currentTerm
 
 	if resp.Term > currentTerm {
+		rf.mu.Unlock()
 		rf.currentTerm = resp.Term
 		rf.transitionToFollower()
 		rf.persist()
@@ -123,15 +125,19 @@ func (rf *RaftNode) handleAppendEntriesReply(peer string, args AppendEntriesArgs
 	}
 
 	if rf.role != Leader || args.LeaderTerm != currentTerm {
+		rf.mu.Unlock()
 		return
 	}
 
 	if resp.Success {
 		rf.matchIndex[peer] = args.PrevLogIndex + len(args.Entries)
 		rf.nextIndex[peer] = rf.matchIndex[peer] + 1
+		rf.mu.Unlock()
 		go rf.tryAdvanceCommitIndex()
 		return
 	} else {
 		rf.nextIndex[peer] = max(0, rf.nextIndex[peer]-1)
 	}
+
+	rf.mu.Unlock()
 }

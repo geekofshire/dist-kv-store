@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 )
 
 type PersistentState struct {
@@ -25,12 +26,20 @@ func (rf *RaftNode) persist() error {
 		return err
 	}
 
-	fileName := rf.getPersistentFileName()
+	fileName, err := rf.getPersistentFileName()
+	if err != nil {
+		return err
+	}
+	
 	return os.WriteFile(fileName, data, 0644)
 }
 
 func (rf *RaftNode) restore() error {
-	fileName := rf.getPersistentFileName()
+	fileName, err := rf.getPersistentFileName()
+	if err != nil {
+		return err
+	}
+	
 	data, err := os.ReadFile(fileName)
 	if err != nil {
 		return err
@@ -50,6 +59,16 @@ func (rf *RaftNode) restore() error {
 	return nil
 }
 
-func (rf *RaftNode) getPersistentFileName() string {
-	return "raft_state_" + rf.id + ".json"
+func (rf *RaftNode) getPersistentFileName() (string, error) {
+	folderPath := "disk_store"
+	fileName := "raft_state_" + rf.id + ".json"
+
+	destPath := filepath.Join(folderPath, fileName)
+
+	err := os.MkdirAll(folderPath, 0755)
+	if err != nil {
+		return "", err
+	}
+
+	return destPath, nil
 }
