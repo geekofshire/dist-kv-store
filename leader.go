@@ -117,10 +117,10 @@ func (rf *RaftNode) handleAppendEntriesReply(peer string, args AppendEntriesArgs
 	currentTerm := rf.currentTerm
 
 	if resp.Term > currentTerm {
-		rf.mu.Unlock()
 		rf.currentTerm = resp.Term
-		rf.transitionToFollower()
 		rf.persist()
+		rf.mu.Unlock()
+		rf.transitionToFollower()
 		return
 	}
 

@@ -605,3 +605,43 @@ func TestFollowerAppliesLeaderCommit(t *testing.T) {
 		return ok && val == "1"
 	})
 }
+
+func TestThreeNodeClusterReplicatesAndAppliesCommand(t *testing.T) {
+	nodes, _ := newTestCluster(t, []string{"node1", "node2", "node3"})
+
+	// node1 := nodes[0]
+	// node2 := nodes[1]
+	// node3 := nodes[2]
+	var leader *RaftNode
+
+	for _, node := range nodes {
+		go node.run()
+		go node.ApplyLoop()
+	}
+
+	waitUntil(t, 2*time.Second, func() bool {
+		isAnyoneLeader := false
+
+		for _, node := range nodes {
+			if getRole(node) == Leader {
+				leader = node
+				isAnyoneLeader = true
+			}
+		}
+
+		return isAnyoneLeader
+	})
+
+	leader.Append(Set, "x", "1")
+
+	waitUntil(t, 2*time.Second, func() bool {
+		for _, node := range nodes {
+			val, ok := node.store.Get("x")
+
+			if !ok || val != "1" {
+				return false
+			}
+		}
+		return true
+	})
+}

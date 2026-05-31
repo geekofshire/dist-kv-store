@@ -125,6 +125,10 @@ func (rf *RaftNode) Append(cmd CommandType, key string, value string) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
+	if rf.role != Leader {
+		return
+	}
+
 	lastLogIndex := func() int {
 		if len(rf.log) == 0 {
 			return -1
