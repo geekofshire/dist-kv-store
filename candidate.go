@@ -10,9 +10,12 @@ func (rf *RaftNode) runCandidate() {
 	rf.currentTerm += 1
 	rf.votedFor = rf.id
 	rf.persist()
+	rf.mu.Unlock()
 	rf.resetElectionTimer()
+	rf.mu.Lock()
 	currentLastTerm := 0
 	currentLastIndex := 0
+	electionTerm := rf.currentTerm
 
 	if len(rf.log) > 0 {
 		last := rf.log[len(rf.log)-1]
@@ -20,7 +23,7 @@ func (rf *RaftNode) runCandidate() {
 		currentLastIndex = last.Index
 	}
 
-	request_vote_args := &RequestVoteArgs{
+	request_vote_args := RequestVoteArgs{
 		Term:         rf.currentTerm,
 		CandidateID:  rf.id,
 		LastLogIndex: currentLastIndex,
@@ -40,12 +43,17 @@ func (rf *RaftNode) runCandidate() {
 		go func(peer string) {
 			defer wg.Done()
 
-			resp, err := rf.transport.RequestVote(peer, *request_vote_args)
+			resp, err := rf.transport.RequestVote(peer, request_vote_args)
 			if err != nil {
 				return
 			}
 
-			results <- resp
+			select {
+			case <-rf.stopCh:
+				return
+
+			case results <- resp:
+			}
 		}(peer)
 	}
 
@@ -55,35 +63,53 @@ func (rf *RaftNode) runCandidate() {
 	}()
 
 	voteCount := 1 // self-vote included
-	for result := range results {
-		rf.mu.Lock()
 
-		if result.Term > rf.currentTerm {
-			rf.currentTerm = result.Term
-			rf.mu.Unlock()
-			rf.persist()
-			rf.transitionToFollower()
-			break
-		}
+	for {
 
-		if !result.VoteGranted {
-			rf.mu.Unlock()
-			continue
-		}
+		select {
 
-		voteCount += 1
-		if voteCount >= (len(rf.peers)/2)+1 {
-			if rf.role != Candidate {
-				rf.mu.Unlock()
-				break
+		case <-rf.stopCh:
+			return
+
+		case result, ok := <-results:
+			if !ok {
+				return
 			}
-			rf.mu.Unlock()
-			//majority granted, become leader
-			rf.transitionToLeader()
-			break
-		}
 
-		rf.mu.Unlock()
+			rf.mu.Lock()
+
+			if rf.currentTerm != electionTerm {
+				rf.mu.Unlock()
+				return
+			}
+
+			if result.Term > rf.currentTerm {
+				rf.currentTerm = result.Term
+				rf.votedFor = ""
+				rf.persist()
+				rf.mu.Unlock()
+				rf.transitionToFollower()
+				return
+			}
+
+			if !result.VoteGranted {
+				rf.mu.Unlock()
+				continue
+			}
+
+			voteCount += 1
+			shouldBecomeLeader :=
+				voteCount >= (len(rf.peers)/2)+1 &&
+					rf.role == Candidate &&
+					rf.currentTerm == electionTerm
+
+			rf.mu.Unlock()
+
+			if shouldBecomeLeader {
+				rf.transitionToLeader()
+				return
+			}
+		}
 	}
 }
 

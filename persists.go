@@ -30,7 +30,7 @@ func (rf *RaftNode) persist() error {
 	if err != nil {
 		return err
 	}
-	
+
 	return os.WriteFile(fileName, data, 0644)
 }
 
@@ -39,7 +39,7 @@ func (rf *RaftNode) restore() error {
 	if err != nil {
 		return err
 	}
-	
+
 	data, err := os.ReadFile(fileName)
 	if err != nil {
 		return err
