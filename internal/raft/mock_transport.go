@@ -1,4 +1,4 @@
-package main
+package raft
 
 import (
 	"fmt"
@@ -61,7 +61,7 @@ func (mt *MockTransport) AppendNodes(nodeID string, node *RaftNode) {
 	mt.nodes[nodeID] = node
 }
 
-func (mt *MockTransport) getLeaderNode() (*RaftNode, error) {
+func (mt *MockTransport) LeaderNode() (*RaftNode, error) {
 	mt.mu.Lock()
 	defer mt.mu.Unlock()
 
@@ -76,6 +76,20 @@ func (mt *MockTransport) getLeaderNode() (*RaftNode, error) {
 	}
 
 	return nil, fmt.Errorf("No leader node found")
+}
+
+func (mt *MockTransport) StartAll() {
+	mt.mu.Lock()
+	nodes := make([]*RaftNode, 0, len(mt.nodes))
+	for _, node := range mt.nodes {
+		nodes = append(nodes, node)
+	}
+	mt.mu.Unlock()
+
+	for _, node := range nodes {
+		go node.Run()
+		go node.ApplyLoop()
+	}
 }
 
 func (mt *MockTransport) RequestVote(

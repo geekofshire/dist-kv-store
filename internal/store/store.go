@@ -1,4 +1,4 @@
-package main
+package store
 
 import (
 	"sync"
@@ -41,18 +41,4 @@ func (s *Store) Delete(key string) bool {
 
 	delete(s.store, key)
 	return true
-}
-
-func (s *Store) ApplyLog(entry Entry) bool {
-	switch entry.Cmd {
-	case Set:
-		s.Set(entry.Key, entry.Value)
-		return true
-
-	case Delete:
-		return s.Delete(entry.Key)
-
-	default:
-		return false
-	}
 }

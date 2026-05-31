@@ -1,6 +1,10 @@
-package main
+package raft
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/geekofshire/dist-kv-store/internal/store"
+)
 
 type Role string
 
@@ -24,7 +28,7 @@ type RaftNode struct {
 	log         []Entry
 
 	// kv store
-	store *Store
+	store *store.Store
 
 	// volatile fields
 	commitIndex int
@@ -52,7 +56,7 @@ func NewRaftNode(id string, peers []string, transport Transport) *RaftNode {
 		peers:           peers,
 		role:            Follower,
 		log:             make([]Entry, 0, 100),
-		store:           NewStore(),
+		store:           store.NewStore(),
 		nextIndex:       make(map[string]int),
 		matchIndex:      make(map[string]int),
 		resetElectionCh: make(chan struct{}, 2),
@@ -151,4 +155,20 @@ func (rf *RaftNode) Append(cmd CommandType, key string, value string) {
 
 	rf.matchIndex[rf.id] = lastLogIndex
 	rf.nextIndex[rf.id] = lastLogIndex + 1
+}
+
+func (rf *RaftNode) Get(key string) (string, bool) {
+	return rf.store.Get(key)
+}
+
+func (rf *RaftNode) SetLocal(key, value string) {
+	rf.store.Set(key, value)
+}
+
+func (rf *RaftNode) ForceLeader() {
+	rf.transitionToLeader()
+}
+
+func (rf *RaftNode) Run() {
+	rf.run()
 }

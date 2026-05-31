@@ -1,14 +1,20 @@
-package main
+package httpapi
 
 import (
 	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
+
+	"github.com/geekofshire/dist-kv-store/internal/raft"
 )
 
 type Server struct {
-	mt *MockTransport
+	mt *raft.MockTransport
+}
+
+func NewServer(mt *raft.MockTransport) *Server {
+	return &Server{mt: mt}
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) error {
@@ -44,13 +50,13 @@ func (s *Server) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// for now read uses leader node.
-	node, err := s.mt.getLeaderNode()
+	node, err := s.mt.LeaderNode()
 	if err != nil {
 		http.Error(w, "can't handle the request at this moment", http.StatusServiceUnavailable)
 		return
 	}
 
-	value, ok := node.store.Get(key)
+	value, ok := node.Get(key)
 	if !ok {
 		http.Error(w, "key not found", http.StatusNotFound)
 		return
@@ -65,12 +71,13 @@ func (s *Server) Get(w http.ResponseWriter, r *http.Request) {
 func (s *Server) Delete(w http.ResponseWriter, r *http.Request) {
 	key := r.PathValue("key")
 
-	node, err := s.mt.getLeaderNode()
+	node, err := s.mt.LeaderNode()
 	if err != nil {
 		http.Error(w, "can't handle the request at this moment", http.StatusServiceUnavailable)
+		return
 	}
 
-	node.Append(Delete, key, "")
+	node.Append(raft.Delete, key, "")
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -90,16 +97,17 @@ func (s *Server) Set(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node, err := s.mt.getLeaderNode()
+	node, err := s.mt.LeaderNode()
 	if err != nil {
 		http.Error(w, "can't handle the request at this moment", http.StatusServiceUnavailable)
+		return
 	}
 
-	node.Append(Set, request.Key, request.Value)
+	node.Append(raft.Set, request.Key, request.Value)
 	w.WriteHeader(http.StatusCreated)
 }
 
-func (s *Server) routes(mux *http.ServeMux) {
+func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /get/{key}", s.Get)
 	mux.HandleFunc("POST /set", s.Set)
 	mux.HandleFunc("PUT /set", s.Set)

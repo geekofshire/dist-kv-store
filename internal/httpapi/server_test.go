@@ -1,42 +1,42 @@
-package main
+package httpapi
 
 import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/geekofshire/dist-kv-store/internal/raft"
 )
 
 func createServerInstance() *Server {
-	mt := NewMockTransport()
+	mt := raft.NewMockTransport()
 
-	node1 := NewRaftNode("A", []string{"A", "B", "C"}, mt)
-	node2 := NewRaftNode("B", []string{"A", "B", "C"}, mt)
-	node3 := NewRaftNode("C", []string{"A", "B", "C"}, mt)
+	node1 := raft.NewRaftNode("A", []string{"A", "B", "C"}, mt)
+	node2 := raft.NewRaftNode("B", []string{"A", "B", "C"}, mt)
+	node3 := raft.NewRaftNode("C", []string{"A", "B", "C"}, mt)
 
 	mt.AppendNodes("A", node1)
 	mt.AppendNodes("B", node2)
 	mt.AppendNodes("C", node3)
 
-	node1.transitionToLeader()
+	node1.ForceLeader()
 
-	server := &Server{
-		mt: mt,
-	}
+	server := NewServer(mt)
 
 	return server
 }
 
 func TestGetHandler(t *testing.T) {
 	server := createServerInstance()
-	node, err := server.mt.getLeaderNode()
+	node, err := server.mt.LeaderNode()
 	if err != nil {
 		t.Fatalf("leader node not working")
 	}
-	node.store.Set("name", "alice")
+	node.SetLocal("name", "alice")
 
 	mux := http.NewServeMux()
-	server.routes(mux)
+	server.Routes(mux)
 
 	req := httptest.NewRequest(
 		http.MethodGet,
@@ -59,7 +59,7 @@ func TestSetHandler(t *testing.T) {
 	server := createServerInstance()
 
 	mux := http.NewServeMux()
-	server.routes(mux)
+	server.Routes(mux)
 
 	body := strings.NewReader(`{"key": "name", "value": "alice"}`)
 
@@ -82,13 +82,13 @@ func TestDeleteHandler(t *testing.T) {
 	server := createServerInstance()
 
 	mux := http.NewServeMux()
-	server.routes(mux)
+	server.Routes(mux)
 
-	node, err := server.mt.getLeaderNode()
+	node, err := server.mt.LeaderNode()
 	if err != nil {
 		t.Fatalf("leader node not working")
 	}
-	node.store.Set("name", "alice")
+	node.SetLocal("name", "alice")
 
 	req := httptest.NewRequest(
 		http.MethodDelete,

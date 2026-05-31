@@ -1,4 +1,4 @@
-package main
+package raft
 
 import (
 	"math/rand"
@@ -161,7 +161,12 @@ func (rf *RaftNode) ApplyLoop() {
 		rf.mu.Unlock()
 
 		for _, entry := range entries {
-			rf.store.ApplyLog(entry)
+			switch entry.Cmd {
+			case Set:
+				rf.store.Set(entry.Key, entry.Value)
+			case Delete:
+				rf.store.Delete(entry.Key)
+			}
 		}
 	}
 }
