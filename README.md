@@ -101,8 +101,8 @@ Raft RPC definitions live in `proto/raft/v1/raft.proto`. Generated Go files are 
 
 ## Next Improvements
 
-- Add `GET /status` for node ID, role, leader ID, term, commit index, and applied index
-- Return leader hints from followers so clients can redirect writes
-- Add real gRPC integration tests with multiple listeners
-- Improve shutdown handling for Raft loops and servers
-- Add snapshots once the replicated log grows large
+- [x] Add `GET /status` for node ID, role, leader ID, term, commit index, and applied index
+- [x] Return leader hints from followers so clients can redirect writes
+- [ ] Add real gRPC integration tests with multiple listeners
+- [ ] Improve shutdown handling for Raft loops and servers
+- [ ] Add snapshots once the replicated log grows large
