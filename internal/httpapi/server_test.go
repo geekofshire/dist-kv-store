@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -100,5 +101,49 @@ func TestDeleteHandler(t *testing.T) {
 
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("expected %d got %d", http.StatusNoContent, rec.Code)
+	}
+}
+
+func TestSetHandlerReturnsLeaderIDWhenNodeIsNotLeader(t *testing.T) {
+	mt := raft.NewMockTransport()
+
+	leader := raft.NewRaftNode("A", []string{"A", "B", "C"}, mt)
+	follower := raft.NewRaftNode("B", []string{"A", "B", "C"}, mt)
+
+	mt.AppendNodes("A", leader)
+	mt.AppendNodes("B", follower)
+
+	leader.ForceLeader()
+	follower.AppendEntries("A", 1, -1, 0, nil, -1)
+
+	server := NewServer(follower)
+	mux := http.NewServeMux()
+	server.Routes(mux)
+
+	body := strings.NewReader(`{"key": "name", "value": "alice"}`)
+	req := httptest.NewRequest(http.MethodPost, "/set", body)
+	req.Header.Set("Content-Type", "application/json")
+
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected status %d, got %d", http.StatusServiceUnavailable, rec.Code)
+	}
+
+	var response struct {
+		Error    string `json:"error"`
+		LeaderID string `json:"leader_id"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if response.Error != "not leader" {
+		t.Fatalf("expected not leader error, got %q", response.Error)
+	}
+
+	if response.LeaderID != "A" {
+		t.Fatalf("expected leader A, got %q", response.LeaderID)
 	}
 }

@@ -41,6 +41,22 @@ func readJSON(r *http.Request, v any) error {
 	return nil
 }
 
+func (s *Server) writeNotLeader(w http.ResponseWriter) {
+	type response struct {
+		Error    string `json:"error"`
+		LeaderID string `json:"leader_id"`
+	}
+
+	_, _, leaderID, _, _, _ := s.node.Status()
+
+	if err := writeJSON(w, http.StatusServiceUnavailable, response{
+		Error:    "not leader",
+		LeaderID: leaderID,
+	}); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
 func (s *Server) Get(w http.ResponseWriter, r *http.Request) {
 	key := r.PathValue("key")
 
@@ -66,7 +82,7 @@ func (s *Server) Delete(w http.ResponseWriter, r *http.Request) {
 
 	if err := s.node.Propose(raft.Delete, key, ""); err != nil {
 		if errors.Is(err, raft.ErrNotLeader) {
-			http.Error(w, "not leader", http.StatusServiceUnavailable)
+			s.writeNotLeader(w)
 			return
 		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -94,7 +110,7 @@ func (s *Server) Set(w http.ResponseWriter, r *http.Request) {
 
 	if err := s.node.Propose(raft.Set, request.Key, request.Value); err != nil {
 		if errors.Is(err, raft.ErrNotLeader) {
-			http.Error(w, "not leader", http.StatusServiceUnavailable)
+			s.writeNotLeader(w)
 			return
 		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
