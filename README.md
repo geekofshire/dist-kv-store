@@ -28,6 +28,30 @@ internal/store/           local key-value store
 proto/raft/v1/            Raft protobuf definitions
 ```
 
+## Project Setup
+
+```bash
+git clone <repo-url>
+cd dist-kv-store
+go mod download
+go test ./...
+```
+
+The generated protobuf files are checked in, so a normal setup does not require `protoc`. If the proto definitions change, regenerate the files before running the app.
+
+## Local Testing Modes
+
+The project supports two ways to exercise Raft locally:
+
+- **In-memory Raft cluster:** used by tests through `MockTransport`. This runs multiple Raft nodes in one Go process without opening network ports, which makes elections, replication, stale terms, and commit behavior easier to test deterministically.
+- **gRPC Raft cluster:** used by the runnable server. Each process owns one `RaftNode`, exposes Raft RPCs over gRPC, and exposes client operations over HTTP.
+
+Run the in-memory test suite with:
+
+```bash
+go test ./internal/raft
+```
+
 ## Run Tests
 
 ```bash
