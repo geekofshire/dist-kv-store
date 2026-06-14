@@ -104,9 +104,35 @@ func (s *Server) Set(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 }
 
+func (s *Server) Status(w http.ResponseWriter, r *http.Request) {
+	type response struct {
+		ID          string `json:"id"`
+		Role        string `json:"role"`
+		LeaderID    string `json:"leader_id"`
+		Term        int    `json:"term"`
+		CommitIndex int    `json:"commit_index"`
+		LastApplied int    `json:"last_applied"`
+	}
+
+	id, role, leaderID, term, commitIndex, lastApplied := s.node.Status()
+
+	err := writeJSON(w, http.StatusOK, response{
+		ID:          id,
+		Role:        string(role),
+		LeaderID:    leaderID,
+		Term:        term,
+		CommitIndex: commitIndex,
+		LastApplied: lastApplied,
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
 func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /get/{key}", s.Get)
 	mux.HandleFunc("POST /set", s.Set)
 	mux.HandleFunc("PUT /set", s.Set)
 	mux.HandleFunc("DELETE /delete/{key}", s.Delete)
+	mux.HandleFunc("GET /status", s.Status)
 }

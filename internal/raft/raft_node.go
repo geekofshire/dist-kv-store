@@ -218,3 +218,15 @@ func (rf *RaftNode) Run() {
 func (rf *RaftNode) Restore() error {
 	return rf.restore()
 }
+
+func (rf *RaftNode) Status() (id string, role Role, leaderID string, term int, commitIndex int, lastApplied int) {
+	rf.mu.RLock()
+	defer rf.mu.RUnlock()
+
+	return rf.id,
+		rf.role,
+		rf.leaderID,
+		rf.currentTerm,
+		rf.commitIndex,
+		rf.lastApplied
+}
