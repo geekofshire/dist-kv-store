@@ -63,6 +63,10 @@ func (rf *RaftNode) runCandidate() {
 	}()
 
 	voteCount := 1 // self-vote included
+	if voteCount >= (len(rf.peers)/2)+1 {
+		rf.transitionToLeader()
+		return
+	}
 
 	for {
 

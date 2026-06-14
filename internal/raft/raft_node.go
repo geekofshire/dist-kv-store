@@ -1,10 +1,13 @@
 package raft
 
 import (
+	"errors"
 	"sync"
 
 	"github.com/geekofshire/dist-kv-store/internal/store"
 )
+
+var ErrNotLeader = errors.New("not leader")
 
 type Role string
 
@@ -158,6 +161,37 @@ func (rf *RaftNode) Append(cmd CommandType, key string, value string) {
 	rf.nextIndex[rf.id] = lastLogIndex + 1
 }
 
+func (rf *RaftNode) Propose(cmd CommandType, key string, value string) error {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	if rf.role != Leader {
+		return ErrNotLeader
+	}
+
+	lastLogIndex := func() int {
+		if len(rf.log) == 0 {
+			return -1
+		}
+		return rf.log[len(rf.log)-1].Index
+	}()
+
+	nextLogIndex := lastLogIndex + 1
+	rf.log = append(rf.log, Entry{
+		Cmd:   cmd,
+		Key:   key,
+		Value: value,
+		Term:  rf.currentTerm,
+		Index: nextLogIndex,
+	})
+	rf.persistLocked()
+
+	rf.matchIndex[rf.id] = nextLogIndex
+	rf.nextIndex[rf.id] = nextLogIndex + 1
+
+	return nil
+}
+
 func (rf *RaftNode) Get(key string) (string, bool) {
 	return rf.store.Get(key)
 }
@@ -179,4 +213,8 @@ func (rf *RaftNode) ForceLeader() {
 
 func (rf *RaftNode) Run() {
 	rf.run()
+}
+
+func (rf *RaftNode) Restore() error {
+	return rf.restore()
 }

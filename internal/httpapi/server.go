@@ -10,11 +10,11 @@ import (
 )
 
 type Server struct {
-	mt *raft.MockTransport
+	node *raft.RaftNode
 }
 
-func NewServer(mt *raft.MockTransport) *Server {
-	return &Server{mt: mt}
+func NewServer(node *raft.RaftNode) *Server {
+	return &Server{node: node}
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) error {
@@ -49,20 +49,13 @@ func (s *Server) Get(w http.ResponseWriter, r *http.Request) {
 		Value string `json:"value"`
 	}
 
-	// for now read uses leader node.
-	node, err := s.mt.LeaderNode()
-	if err != nil {
-		http.Error(w, "can't handle the request at this moment", http.StatusServiceUnavailable)
-		return
-	}
-
-	value, ok := node.Get(key)
+	value, ok := s.node.Get(key)
 	if !ok {
 		http.Error(w, "key not found", http.StatusNotFound)
 		return
 	}
 
-	err = writeJSON(w, http.StatusOK, &response{Key: key, Value: value})
+	err := writeJSON(w, http.StatusOK, &response{Key: key, Value: value})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -71,13 +64,15 @@ func (s *Server) Get(w http.ResponseWriter, r *http.Request) {
 func (s *Server) Delete(w http.ResponseWriter, r *http.Request) {
 	key := r.PathValue("key")
 
-	node, err := s.mt.LeaderNode()
-	if err != nil {
-		http.Error(w, "can't handle the request at this moment", http.StatusServiceUnavailable)
+	if err := s.node.Propose(raft.Delete, key, ""); err != nil {
+		if errors.Is(err, raft.ErrNotLeader) {
+			http.Error(w, "not leader", http.StatusServiceUnavailable)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	node.Append(raft.Delete, key, "")
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -97,13 +92,15 @@ func (s *Server) Set(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node, err := s.mt.LeaderNode()
-	if err != nil {
-		http.Error(w, "can't handle the request at this moment", http.StatusServiceUnavailable)
+	if err := s.node.Propose(raft.Set, request.Key, request.Value); err != nil {
+		if errors.Is(err, raft.ErrNotLeader) {
+			http.Error(w, "not leader", http.StatusServiceUnavailable)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	node.Append(raft.Set, request.Key, request.Value)
 	w.WriteHeader(http.StatusCreated)
 }
 

@@ -9,7 +9,14 @@ import (
 	"github.com/geekofshire/dist-kv-store/internal/raft"
 )
 
-func createServerInstance() *Server {
+type testServer struct {
+	server *Server
+	node   *raft.RaftNode
+}
+
+func createServerInstance(t *testing.T) testServer {
+	t.Helper()
+
 	mt := raft.NewMockTransport()
 
 	node1 := raft.NewRaftNode("A", []string{"A", "B", "C"}, mt)
@@ -22,21 +29,18 @@ func createServerInstance() *Server {
 
 	node1.ForceLeader()
 
-	server := NewServer(mt)
-
-	return server
+	return testServer{
+		server: NewServer(node1),
+		node:   node1,
+	}
 }
 
 func TestGetHandler(t *testing.T) {
-	server := createServerInstance()
-	node, err := server.mt.LeaderNode()
-	if err != nil {
-		t.Fatalf("leader node not working")
-	}
-	node.SetLocal("name", "alice")
+	fixture := createServerInstance(t)
+	fixture.node.SetLocal("name", "alice")
 
 	mux := http.NewServeMux()
-	server.Routes(mux)
+	fixture.server.Routes(mux)
 
 	req := httptest.NewRequest(
 		http.MethodGet,
@@ -56,10 +60,10 @@ func TestGetHandler(t *testing.T) {
 }
 
 func TestSetHandler(t *testing.T) {
-	server := createServerInstance()
+	fixture := createServerInstance(t)
 
 	mux := http.NewServeMux()
-	server.Routes(mux)
+	fixture.server.Routes(mux)
 
 	body := strings.NewReader(`{"key": "name", "value": "alice"}`)
 
@@ -79,16 +83,11 @@ func TestSetHandler(t *testing.T) {
 }
 
 func TestDeleteHandler(t *testing.T) {
-	server := createServerInstance()
+	fixture := createServerInstance(t)
 
 	mux := http.NewServeMux()
-	server.Routes(mux)
-
-	node, err := server.mt.LeaderNode()
-	if err != nil {
-		t.Fatalf("leader node not working")
-	}
-	node.SetLocal("name", "alice")
+	fixture.server.Routes(mux)
+	fixture.node.SetLocal("name", "alice")
 
 	req := httptest.NewRequest(
 		http.MethodDelete,
